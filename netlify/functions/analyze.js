@@ -1,9 +1,7 @@
-// 라이브러리 이름과 가져오는 항목들을 최신 버전으로 수정
-const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/genai");
+const { GoogleGenerativeAI } = require("@google/genai");
 
 const API_KEY = process.env.GEMINI_API_KEY;
 
-// 스키마는 이전과 동일하게 하나로 통합된 상태를 유지
 const analysisSchema = {
   type: "OBJECT",
   properties: {
@@ -16,7 +14,7 @@ const analysisSchema = {
         carbohydrates: {
           type: "OBJECT",
           properties: {
-            total: { type: "NUMBER", description: "총 탄수화물 (g)." },
+            total: { type: "NUMBER", description: "총 탄화물 (g)." },
             sugars: { type: "NUMBER", description: "당류 (g)." },
             fiber: { type: "NUMBER", description: "식이섬유 (g)." },
           },
@@ -55,18 +53,16 @@ exports.handler = async function (event, context) {
     return { statusCode: 500, body: JSON.stringify({ error: "서버 설정 오류: API 키가 구성되지 않았습니다." }) };
   }
   
-  // --- START: AI 초기화 코드 수정 ---
-  const genAI = new GoogleGenerativeAI(API_KEY);
-  const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: analysisSchema,
-    },
-  });
-  // --- END: AI 초기화 코드 수정 ---
-
   try {
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: analysisSchema,
+      },
+    });
+
     const { imageBase64, mimeType } = JSON.parse(event.body);
     if (!imageBase64 || !mimeType) {
       return { statusCode: 400, body: JSON.stringify({ error: "이미지 데이터가 없습니다." }) };
@@ -81,14 +77,17 @@ exports.handler = async function (event, context) {
       이 두 가지 결과를 모두 포함하여 JSON 형식으로 응답해야 합니다.` 
     };
 
-    // API 호출 부분을 더 간단하게 수정
     const result = await model.generateContent([textPart, imagePart]);
-    const responsePayload = result.response.candidates[0].content.parts[0].text;
+    
+    // --- START: 응답 처리 코드 수정 ---
+    const response = result.response;
+    const responseText = response.text();
+    // --- END: 응답 처리 코드 수정 ---
     
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: responsePayload, // API가 이미 JSON 문자열을 주므로 그대로 반환
+      body: responseText, 
     };
 
   } catch (error) {
@@ -99,5 +98,4 @@ exports.handler = async function (event, context) {
       body: JSON.stringify({ error: errorMessage }),
     };
   }
-};```
-
+};
