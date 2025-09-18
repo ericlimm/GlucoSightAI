@@ -1,49 +1,49 @@
-const { GoogleGenAI, Type } = require("@google/genai");
+// 라이브러리 이름과 가져오는 항목들을 최신 버전으로 수정
+const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/genai");
 
 const API_KEY = process.env.GEMINI_API_KEY;
 
-// --- START: 스키마를 하나로 통합 ---
+// 스키마는 이전과 동일하게 하나로 통합된 상태를 유지
 const analysisSchema = {
-  type: Type.OBJECT,
+  type: "OBJECT",
   properties: {
     nutrition: {
-      type: Type.OBJECT,
+      type: "OBJECT",
       description: "음식의 영양 정보.",
       properties: {
-        foodName: { type: Type.STRING, description: "음식의 이름 (예: '닭가슴살 샐러드')." },
-        calories: { type: Type.NUMBER, description: "총 칼로리 (kcal)." },
+        foodName: { type: "STRING", description: "음식의 이름 (예: '닭가슴살 샐러드')." },
+        calories: { type: "NUMBER", description: "총 칼로리 (kcal)." },
         carbohydrates: {
-          type: Type.OBJECT,
+          type: "OBJECT",
           properties: {
-            total: { type: Type.NUMBER, description: "총 탄수화물 (g)." },
-            sugars: { type: Type.NUMBER, description: "당류 (g)." },
-            fiber: { type: Type.NUMBER, description: "식이섬유 (g)." },
+            total: { type: "NUMBER", description: "총 탄수화물 (g)." },
+            sugars: { type: "NUMBER", description: "당류 (g)." },
+            fiber: { type: "NUMBER", description: "식이섬유 (g)." },
           },
           required: ['total', 'sugars', 'fiber']
         },
-        protein: { type: Type.NUMBER, description: "단백질 (g)." },
-        fat: { type: Type.NUMBER, description: "총 지방 (g)." },
-        glycemicIndex: { type: Type.NUMBER, description: "예상 혈당지수 (GI) (1-100)." },
+        protein: { type: "NUMBER", description: "단백질 (g)." },
+        fat: { type: "NUMBER", description: "총 지방 (g)." },
+        glycemicIndex: { type: "NUMBER", description: "예상 혈당지수 (GI) (1-100)." },
       },
       required: ['foodName', 'calories', 'carbohydrates', 'protein', 'fat', 'glycemicIndex']
     },
     impact: {
-      type: Type.OBJECT,
+      type: "OBJECT",
       description: "예상 혈당 영향 분석.",
       properties: {
         level: {
-          type: Type.STRING,
+          type: "STRING",
           enum: ['STABLE', 'MODERATE', 'HIGH'],
           description: "혈당 영향 수준: 'STABLE' (안정), 'MODERATE' (보통), 'HIGH' (높음)."
         },
-        explanation: { type: Type.STRING, description: "당뇨 환자를 위한 쉽고 간단한 한국어 설명." }
+        explanation: { type: "STRING", description: "당뇨 환자를 위한 쉽고 간단한 한국어 설명." }
       },
       required: ['level', 'explanation']
     }
   },
   required: ['nutrition', 'impact']
 };
-// --- END: 스키마 통합 ---
 
 
 exports.handler = async function (event, context) {
@@ -55,7 +55,16 @@ exports.handler = async function (event, context) {
     return { statusCode: 500, body: JSON.stringify({ error: "서버 설정 오류: API 키가 구성되지 않았습니다." }) };
   }
   
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  // --- START: AI 초기화 코드 수정 ---
+  const genAI = new GoogleGenerativeAI(API_KEY);
+  const model = genAI.getGenerativeModel({
+    model: "gemini-1.5-flash",
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: analysisSchema,
+    },
+  });
+  // --- END: AI 초기화 코드 수정 ---
 
   try {
     const { imageBase64, mimeType } = JSON.parse(event.body);
@@ -65,46 +74,30 @@ exports.handler = async function (event, context) {
 
     const imagePart = { inlineData: { data: imageBase64, mimeType: mimeType } };
     
-    // --- START: 프롬프트를 하나로 통합 ---
     const textPart = { 
       text: `당뇨병 환자를 위한 영양사로서 이 이미지의 음식을 분석해주세요. 
       1. 음식 종류를 식별하고 양을 추정하여, 전체 식사에 대한 예상 영양 정보를 계산해주세요.
       2. 그 영양 정보를 바탕으로, 일반적인 당뇨병 환자의 혈당에 미칠 영향을 'STABLE', 'MODERATE', 'HIGH' 중 하나로 분류하고, 그 이유를 쉽고 간단한 한국어로 설명해주세요.
-      이 두 가지 결과를 모두 포함하여 정확한 JSON 형식으로 응답해야 합니다.` 
+      이 두 가지 결과를 모두 포함하여 JSON 형식으로 응답해야 합니다.` 
     };
-    // --- END: 프롬프트 통합 ---
 
-    // --- START: API 호출을 한 번으로 변경 ---
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent({
-      contents: [{ parts: [imagePart, textPart] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: analysisSchema,
-      },
-    });
-
-    const responsePayload = JSON.parse(result.response.text());
-    // --- END: API 호출 변경 ---
-    
-    // 응답 형식 검증 (선택적이지만 안정성을 위해 추가)
-    if (!responsePayload.nutrition || !responsePayload.impact) {
-      throw new Error("API로부터 완전한 분석 데이터를 받지 못했습니다.");
-    }
+    // API 호출 부분을 더 간단하게 수정
+    const result = await model.generateContent([textPart, imagePart]);
+    const responsePayload = result.response.candidates[0].content.parts[0].text;
     
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(responsePayload),
+      body: responsePayload, // API가 이미 JSON 문자열을 주므로 그대로 반환
     };
 
   } catch (error) {
     console.error('Error in Netlify function:', error);
-    // Google API에서 발생한 오류 메시지를 좀 더 구체적으로 전달
-    const errorMessage = error.response?.text() || error.message || "서버에서 AI 분석 중 알 수 없는 오류가 발생했습니다.";
+    const errorMessage = error.message || "서버에서 AI 분석 중 알 수 없는 오류가 발생했습니다.";
     return {
       statusCode: 500,
       body: JSON.stringify({ error: errorMessage }),
     };
   }
-};
+};```
+
