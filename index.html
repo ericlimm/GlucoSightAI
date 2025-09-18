@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2310B981'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' /%3E%3C/svg%3E" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GlucoSight AI</title>
+    <link rel="manifest" href="data:application/json;base64,ewogICJzaG9ydF9uYW1lIjogIkdsdWNvU2lnaHQiLAogICJuYW1lIjogIkdsdWNvU2lnaHQgQUkiLAogICJpY29ucyI6IFsKICAgICAgewogICAgICAgICJzcmMiOiAiZGF0YTppbWFnZS9zdmcreG1sLCUzQ3N2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCAyNCAyNCcgZmlsbD0nJTIzMTBCOTgxJyUzRSUzQ3BhdGggc3Ryb2tlLWxpbmVjYXA9J3JvdW5kJyBzdHJva2UtbGluZWpvaW49J3JvdW5kJyBkPSdNOSA١MmwyIDIgNC00bTYgMmE5IDkgMCAxMTE4IDAgOSA5IDAgMDExOCAweiIgLyUzRSUzQy9zdmclM0UiLAogICAgICAgICJ0eXBlIjogImltYWdlL3N2Zyt4bWwiLAogICAgICAgICJzaXplcyI6ICIxOTJ4MTkyIDUxMng1MTIiCiAgICAgIH0KICAgIF0sCiAgInN0YXJ0X3VybCI6ICIuIiwKICAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwKICAidGhlbWVfY29sb3IiOiAiIzM0ZDM5OSIsCiAgImJhY2tncm91bmRfY29sb3IiOiAiI2Y5ZmFmYiIKfQ==" />
+    <meta name="theme-color" content="#34d399" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.3.1",
+        "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+        "browser-image-compression": "https://esm.sh/browser-image-compression@2.0.2"
+      }
+    }
+    </script>
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
+    <script type="module">
+      import React, { useState, useCallback, useEffect, useRef } from 'react';
+      import ReactDOM from 'react-dom/client';
+      import imageCompression from "browser-image-compression";
+
+      // --- START: TYPES ---
+      const BloodSugarImpactLevel = { STABLE: 'STABLE', MODERATE: 'MODERATE', HIGH: 'HIGH' };
+
+      // --- START: ICONS ---
+      const CameraIcon = (props) => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", strokeWidth: 1.5, stroke: "currentColor", ...props }, React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.776 48.776 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" }), React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" }));
+      const UploadIcon = (props) => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", strokeWidth: 1.5, stroke: "currentColor", ...props }, React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" }));
+      const InfoIcon = (props) => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", strokeWidth: 1.5, stroke: "currentColor", ...props }, React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", d: "M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" }));
+
+      // --- START: API SERVICE ---
+      const analyzeFoodImage = async (imageBase64, mimeType) => {
+        try {
+          const response = await fetch('/.netlify/functions/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageBase64, mimeType }),
+          });
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: `서버 응답 오류: ${response.status}` }));
+            throw new Error(errorData.error || `서버 오류: ${response.status}`);
+          }
+          return await response.json();
+        } catch (error) {
+          console.error("Error calling backend function:", error);
+          throw new Error(error.message || "분석 서버와 통신 중 오류가 발생했습니다.");
+        }
+      };
+
+      // --- START: COMPONENTS ---
+      const Header=()=>React.createElement('header',{className:"bg-white/80 backdrop-blur-sm w-full border-b border-gray-200/80"},React.createElement('div',{className:"py-4 px-4 sm:px-6 lg:px-8"},React.createElement('div',{className:"flex items-center justify-center space-x-3"},React.createElement('svg',{className:"w-8 h-8 text-emerald-500",fill:"none",stroke:"currentColor",viewBox:"0 0 24 24",xmlns:"http://www.w3.org/2000/svg"},React.createElement('path',{strokeLinecap:"round",strokeLinejoin:"round",strokeWidth:2,d:"M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"})),React.createElement('h1',{className:"text-2xl font-bold text-gray-800 tracking-tight"},"GlucoSight AI"))));
+      const Loader=()=>{const e=["AI가 이미지를 분석하고 있습니다...","영양 정보를 계산하는 중입니다...","잠시만 기다려주세요...","혈당 영향을 예측하고 있습니다..."],t=React.useState(e[0]),a=t[0],n=t[1];return React.useEffect(()=>{const t=setInterval(()=>{n(t=>{const a=(e.indexOf(t)+1)%e.length;return e[a]})},2500);return()=>clearInterval(t)},[]),React.createElement('div',{className:"flex flex-col items-center justify-center p-8 text-center"},React.createElement('div',{className:"relative flex items-center justify-center w-24 h-24"},React.createElement('div',{className:"absolute w-full h-full border-4 border-gray-200 rounded-full"}),React.createElement('div',{className:"absolute w-full h-full border-t-4 border-emerald-500 rounded-full animate-spin"})),React.createElement('p',{className:"mt-6 text-lg font-medium text-gray-700"},a))};
+      const processAndResizeImage=async t=>{console.log(`Original file: ${t.name}, type: ${t.type}, size: ${Math.round(t.size/1024)} KB`);const e={maxSizeMB:2,maxWidthOrHeight:1280,useWebWorker:false,exifOrientation:true,fileType:"image/jpeg"};try{const a=await imageCompression(t,e);console.log(`Compressed file: ${a.name}, type: ${a.type}, size: ${Math.round(a.size/1024)} KB`);return new Promise((n,c)=>{const i=new FileReader;i.onload=t=>{t.target&&"string"==typeof t.target.result?n({base64:t.target.result.split(",")[1],mimeType:"image/jpeg"}):c(new Error("압축된 파일을 읽는 데 실패했습니다."))},i.onerror=t=>c(t),i.readAsDataURL(a)})}catch(t){console.error("Image processing error:",t);const e=t instanceof Error?t.message:String(t);throw new Error(`이미지 처리 중 오류 발생: ${e}`)}};
+      const FoodUploader=({onImageAnalyzed:t,disabled:e})=>{const a=useRef(null),n=useRef(null),c=async c=>{const i=c.target.files?.[0];if(i)try{const{base64:e,mimeType:a}=await processAndResizeImage(i);t(e,a)}catch(c){console.error("Error processing image:",c),alert(c.message||"이미지 처리 중 알 수 없는 오류가 발생했습니다.")}};return React.createElement('div',{className:"bg-white/50 p-6 sm:p-8 rounded-2xl shadow-lg border border-gray-200/80"},React.createElement('div',{className:"flex flex-col sm:flex-row gap-4"},React.createElement('button',{onClick:()=>a.current?.click(),disabled:e,className:"flex-1 inline-flex items-center justify-center px-6 py-4 border border-transparent text-base font-bold rounded-xl text-white bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-600 hover:to-emerald-600 disabled:opacity-50 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"},React.createElement(CameraIcon,{className:"w-6 h-6 mr-3"}),"사진 찍기"),React.createElement('button',{onClick:()=>n.current?.click(),disabled:e,className:"flex-1 inline-flex items-center justify-center px-6 py-4 border border-gray-300 text-base font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-100 disabled:bg-gray-200 transition-colors"},React.createElement(UploadIcon,{className:"w-6 h-6 mr-3"}),"이미지 업로드")),React.createElement('input',{type:"file",ref:a,className:"hidden",accept:"image/*",capture:"environment",onChange:c}),React.createElement('input',{type:"file",ref:n,className:"hidden",accept:"image/*",onChange:c}),React.createElement('p',{className:"mt-4 text-sm text-gray-500 text-center"},"정확한 분석을 위해 음식이 잘 보이는 선명한 사진을 사용해주세요."))};
+      const BloodSugarGauge=({level:t})=>{const e={[BloodSugarImpactLevel.STABLE]:{label:"안정권",barClass:"w-1/3 bg-emerald-500",textColor:"text-emerald-600",icon:React.createElement("svg",{className:"w-6 h-6",fill:"none",stroke:"currentColor",viewBox:"0 0 24 24",xmlns:"http://www.w3.org/2000/svg"},React.createElement("path",{strokeLinecap:"round",strokeLinejoin:"round",strokeWidth:2,d:"M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.085a2 2 0 00-1.736.97l-2.085 3.754M14 10L7 20"}))},[BloodSugarImpactLevel.MODERATE]:{label:"주의권",barClass:"w-2/3 bg-amber-500",textColor:"text-amber-600",icon:React.createElement("svg",{className:"w-6 h-6",fill:"none",stroke:"currentColor",viewBox:"0 0 24 24",xmlns:"http://www.w3.org/2000/svg"},React.createElement("path",{strokeLinecap:"round",strokeLinejoin:"round",strokeWidth:2,d:"M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"}))},[BloodSugarImpactLevel.HIGH]:{label:"위험권",barClass:"w-full bg-red-500",textColor:"text-red-600",icon:React.createElement("svg",{className:"w-6 h-6",fill:"none",stroke:"currentColor",viewBox:"0 0 24 24",xmlns:"http://www.w3.org/2000/svg"},React.createElement("path",{strokeLinecap:"round",strokeLinejoin:"round",strokeWidth:2,d:"M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"}))}},a=e[t];return React.createElement('div',{className:"p-4 rounded-xl border border-gray-200/80 bg-white"},React.createElement('div',{className:"flex justify-between items-center mb-2"},React.createElement('span',{className:"text-xs font-medium text-gray-500"},"낮음"),React.createElement('span',{className:"text-xs font-medium text-gray-500"},"중간"),React.createElement('span',{className:"text-xs font-medium text-gray-500"},"높음")),React.createElement('div',{className:"w-full bg-gray-200 rounded-full h-3 overflow-hidden"},React.createElement('div',{className:`h-full rounded-full transition-all duration-700 ease-out ${a.barClass}`})),React.createElement('div',{className:`mt-3 flex items-center justify-center font-bold text-lg ${a.textColor}`},a.icon,React.createElement('span',{className:"ml-2"},a.label)))};
+      const AnalysisResult=({data:t,imageDataUrl:e,onReset:a})=>{const{nutrition:n,impact:c}=t,i={[BloodSugarImpactLevel.STABLE]:{bg:"bg-emerald-50",border:"border-emerald-400",text:"text-emerald-800",icon:"text-emerald-500"},[BloodSugarImpactLevel.MODERATE]:{bg:"bg-amber-50",border:"border-amber-400",text:"text-amber-800",icon:"text-amber-500"},[BloodSugarImpactLevel.HIGH]:{bg:"bg-red-50",border:"border-red-400",text:"text-red-800",icon:"text-red-500"}},l=i[c.level],s=({label:t,value:e,unit:a,isSubItem:n=!1})=>React.createElement("div",{className:`flex justify-between items-baseline py-3 ${n?"pl-4":""} border-b border-gray-200/80`},React.createElement("span",{className:`text-sm ${n?"text-gray-500":"font-medium text-gray-600"}`},t),React.createElement("p",{className:"text-right"},React.createElement("span",{className:"text-lg font-bold text-gray-800"},e),React.createElement("span",{className:"ml-1 text-xs text-gray-500"},a)));return React.createElement('div',{className:"w-full bg-white rounded-2xl shadow-xl overflow-hidden animate-fade-in text-left"},React.createElement('img',{src:e,alt:n.foodName,className:"w-full h-48 object-cover"}),React.createElement('div',{className:"p-5"},React.createElement('p',{className:"text-sm font-medium text-emerald-600"},"AI 분석 완료"),React.createElement('h2',{className:"text-3xl font-bold text-gray-800 mt-1"},n.foodName),React.createElement('div',{className:"mt-4 flex items-baseline justify-center bg-gray-100 p-3 rounded-lg text-center"},React.createElement('span',{className:"text-4xl font-bold text-gray-800"},n.calories),React.createElement('span',{className:"ml-2 text-lg text-gray-600 font-medium"},"kcal"))),React.createElement('div',{className:"p-5 bg-gray-50"},React.createElement('h3',{className:"text-lg font-semibold text-gray-700 mb-3"},"예상 혈당 영향"),React.createElement(BloodSugarGauge,{level:c.level}),React.createElement('div',{className:`mt-4 ${l.bg} border-l-4 ${l.border} ${l.text} p-4 rounded-r-lg`,role:"alert"},React.createElement('div',{className:"flex"},React.createElement('div',{className:"py-1"},React.createElement(InfoIcon,{className:`w-6 h-6 mr-3 ${l.icon}`})),React.createElement('div',null,React.createElement('p',{className:"font-semibold"},"AI 분석 요약"),React.createElement('p',{className:"text-sm"},c.explanation))))),React.createElement('div',{className:"p-5"},React.createElement('h3',{className:"text-lg font-semibold text-gray-700 mb-2"},"상세 영양 정보"),React.createElement('div',{className:"space-y-0"},React.createElement(s,{label:"총 탄수화물",value:n.carbohydrates.total,unit:"g"}),React.createElement(s,{label:"당류",value:n.carbohydrates.sugars,unit:"g",isSubItem:!0}),React.createElement(s,{label:"식이섬유",value:n.carbohydrates.fiber,unit:"g",isSubItem:!0}),React.createElement(s,{label:"단백질",value:n.protein,unit:"g"}),React.createElement(s,{label:"지방",value:n.fat,unit:"g"}),React.createElement(s,{label:"혈당지수 (GI) 예상치",value:n.glycemicIndex,unit:""}))),React.createElement('div',{className:"p-5 bg-gray-50 border-t border-gray-200"},React.createElement('button',{onClick:a,className:"w-full inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-bold rounded-xl text-white bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-600 hover:to-emerald-600 disabled:opacity-50 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"},"다른 음식 분석하기")))};
+
+      // --- START: MAIN APP COMPONENT ---
+      const App = () => {
+        const [appState, setAppState] = useState('idle');
+        const [analysisData, setAnalysisData] = useState(null);
+        const [error, setError] = useState(null);
+        const [uploadedImage, setUploadedImage] = useState(null);
+
+        const handleImageAnalyzed = useCallback(async (imageBase64, mimeType) => {
+          setAppState('analyzing');
+          setError(null);
+          const fullDataUrl = `data:${mimeType};base64,${imageBase64}`;
+          setUploadedImage(fullDataUrl);
+          try {
+            const result = await analyzeFoodImage(imageBase64, mimeType);
+            setAnalysisData(result);
+            setAppState('success');
+          } catch (err) {
+            console.error(err);
+            const errorMessage = err instanceof Error ? err.message : '음식 분석 중 오류가 발생했습니다.';
+            setError(errorMessage);
+            setAppState('error');
+          }
+        }, []);
+        
+        const handleReset = () => {
+          setAppState('idle'); setAnalysisData(null); setError(null); setUploadedImage(null);
+        };
+
+        const showWelcome = appState === 'idle';
+        const showLoader = appState === 'analyzing';
+        const showResult = appState === 'success' && analysisData && uploadedImage;
+        const showError = appState === 'error';
+
+        return React.createElement('div', { className: "min-h-screen font-sans text-gray-800 flex flex-col items-center justify-center p-2 sm:p-4" },
+          React.createElement('div', { className: "w-full max-w-md mx-auto bg-transparent rounded-3xl overflow-hidden flex flex-col", style: { minHeight: 'calc(100vh - 2rem)' } },
+            !showLoader && !showResult && React.createElement(Header),
+            React.createElement('main', { className: "flex-grow flex flex-col items-center justify-center p-4 sm:p-6 text-center" },
+              showWelcome && React.createElement('div', { className: "text-center" },
+                React.createElement('h2', { className: "text-3xl sm:text-4xl font-bold text-gray-800 mb-3 tracking-tight" }, "당신의 식단, AI로 관리하세요"),
+                React.createElement('p', { className: "text-gray-600 mb-8 max-w-md mx-auto" }, "사진 한 장으로 간편하게 영양 정보를 확인하고 혈당 변화를 예측해보세요."),
+                React.createElement(FoodUploader, { onImageAnalyzed: handleImageAnalyzed, disabled: appState !== 'idle' })
+              ),
+              showLoader && React.createElement(Loader),
+              showError && React.createElement('div', { className: "text-center p-6 bg-white rounded-xl shadow-lg w-full max-w-md" },
+                React.createElement('h3', { className: "text-xl font-bold text-red-600 mb-4" }, "오류 발생"),
+                React.createElement('p', { className: "text-gray-600 mb-6" }, error),
+                React.createElement('button', { onClick: handleReset, className: "mt-6 w-full inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-bold rounded-xl text-white bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-600 hover:to-emerald-600 disabled:opacity-50 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5" }, "다시 시도하기")
+              ),
+              showResult && React.createElement(AnalysisResult, { data: analysisData, imageDataUrl: uploadedImage, onReset: handleReset })
+            ),
+            React.createElement('footer', { className: "text-center p-4 text-xs text-gray-500/80 bg-white/20 rounded-b-3xl" }, "© 2025 GlucoSight AI. For NJH")
+          )
+        );
+      };
+      
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(React.createElement(App));
+    </script>
+</body>
+</html>
