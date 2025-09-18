@@ -1,10 +1,7 @@
-// --- START: 라이브러리 로딩 방식 수정 ---
-const genAI = require("@google/genai");
-// --- END: 라이브러리 로딩 방식 수정 ---
+const { GoogleGenerativeAI } = require("@google/genai");
 
 const API_KEY = process.env.GEMINI_API_KEY;
 
-// 스키마 정의는 JSON 형식의 문자열이 아닌, 자바스크립트 객체로 직접 정의합니다.
 const analysisSchema = {
   type: "OBJECT",
   properties: {
@@ -57,16 +54,14 @@ exports.handler = async function (event, context) {
   }
   
   try {
-    // --- START: AI 초기화 방식 수정 ---
-    const googleAI = new genAI.GoogleGenerativeAI(API_KEY);
-    const model = googleAI.getGenerativeModel({
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: analysisSchema,
       },
     });
-    // --- END: AI 초기화 방식 수정 ---
 
     const { imageBase64, mimeType } = JSON.parse(event.body);
     if (!imageBase64 || !mimeType) {
