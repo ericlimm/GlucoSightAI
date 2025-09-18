@@ -2,6 +2,7 @@ const { GoogleGenerativeAI } = require("@google/genai");
 
 const API_KEY = process.env.GEMINI_API_KEY;
 
+// 스키마 정의는 이전과 동일합니다.
 const analysisSchema = {
   type: "OBJECT",
   properties: {
@@ -49,14 +50,13 @@ exports.handler = async function (event, context) {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }
   if (!API_KEY) {
-    console.error("GEMINI_API_KEY environment variable not set.");
     return { statusCode: 500, body: JSON.stringify({ error: "서버 설정 오류: API 키가 구성되지 않았습니다." }) };
   }
   
   try {
     const genAI = new GoogleGenerativeAI(API_KEY);
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
+      model: "gemini-1.5-flash", 
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: analysisSchema,
