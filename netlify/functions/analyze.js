@@ -49,15 +49,12 @@ exports.handler = async function (event, context) {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }
+  if (!API_KEY) {
+    return { statusCode: 500, body: JSON.stringify({ error: "서버 설정 오류: API 키가 구성되지 않았습니다." }) };
+  }
   
   try {
     const genAI = new GoogleGenAI(API_KEY);
-
-    // --- START: API 호출 방식 최종 수정 ---
-    // 1. 사용할 모델을 먼저 가져옵니다.
-    const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash"
-    });
 
     const { imageBase64, mimeType } = JSON.parse(event.body);
     if (!imageBase64 || !mimeType) {
@@ -72,9 +69,10 @@ exports.handler = async function (event, context) {
       2. 그 영양 정보를 바탕으로, 일반적인 당뇨병 환자의 혈당에 미칠 영향을 'STABLE', 'MODERATE', 'HIGH' 중 하나로 분류하고, 그 이유를 쉽고 간단한 한국어로 설명해주세요.
       이 두 가지 결과를 모두 포함하여 JSON 형식으로 응답해야 합니다.` 
     };
-    
-    // 2. 모델에 콘텐츠와 출력 형식을 전달하여 결과를 생성합니다.
-    const result = await model.generateContent({
+
+    // --- START: API 호출 방식 최종 수정 ---
+    const result = await genAI.models.generateContent({
+        model: "gemini-1.5-flash",
         contents: [{ parts: [textPart, imagePart] }],
         generationConfig: {
             responseMimeType: "application/json",
@@ -83,21 +81,4 @@ exports.handler = async function (event, context) {
     });
     // --- END: API 호출 방식 최종 수정 ---
 
-    const response = result.response;
-    const responseText = response.text();
-    
-    return {
-      statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: responseText, 
-    };
-
-  } catch (error) {
-    console.error('Error in Netlify function:', error);
-    const errorMessage = error.message || "서버에서 AI 분석 중 알 수 없는 오류가 발생했습니다.";
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: errorMessage }),
-    };
-  }
-};
+    c
