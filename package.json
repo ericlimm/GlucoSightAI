@@ -2,8 +2,9 @@
   "name": "gluco-sight-backend",
   "version": "1.0.0",
   "dependencies": {
-    "@google/genai": "0.13.0"
-  },
+  "@google/genai": "0.13.0",
+  "encoding": "^0.1.13"
+},
   "devDependencies": {
     "esbuild": "^0.23.0" 
   },
@@ -11,3 +12,4 @@
     "build": "esbuild netlify/functions/analyze.js --bundle --platform=node --outfile=netlify/functions-dist/analyze.js"
   }
 }
+
