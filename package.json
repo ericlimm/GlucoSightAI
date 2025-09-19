@@ -2,9 +2,6 @@
   "name": "gluco-sight-backend",
   "version": "1.0.0",
   "dependencies": {
-    "@google/genai": "0.13.0",
-    "encoding": "^0.1.13",
-    "supports-color": "^9.4.0",
-    "bufferutil": "^4.0.8"
+    "@google/genai": "0.13.0"
   }
 }
