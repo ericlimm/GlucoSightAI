@@ -43,19 +43,8 @@ const analysisSchema = {
   required: ['nutrition', 'impact']
 };
 
-exports.handler = async function (event, context) {
-  // --- START: 진단 코드 ---
-  // AI 라이브러리가 올바르게 로드되었는지 확인합니다.
-  if (typeof GoogleGenerativeAI !== 'function') {
-    const errorMessage = "심각한 서버 오류: GoogleGenerativeAI가 함수/클래스로 로드되지 않았습니다. 라이브러리 설치 또는 로딩 과정에 문제가 있습니다.";
-    console.error(errorMessage);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: "AI 라이브러리를 초기화하는 데 실패했습니다." }),
-    };
-  }
-  // --- END: 진단 코드 ---
 
+exports.handler = async function (event, context) {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }
@@ -100,10 +89,6 @@ exports.handler = async function (event, context) {
 
   } catch (error) {
     console.error('Error in Netlify function:', error);
-    // 생성자 오류가 여기서 다시 발생할 경우를 대비한 상세 로그 추가
-    if (error instanceof TypeError && error.message.includes("is not a constructor")) {
-       console.error("추가 정보: 생성자(Constructor) 오류가 try-catch 블록 내부에서 발생했습니다.");
-    }
     const errorMessage = error.message || "서버에서 AI 분석 중 알 수 없는 오류가 발생했습니다.";
     return {
       statusCode: 500,
@@ -111,4 +96,3 @@ exports.handler = async function (event, context) {
     };
   }
 };
-
