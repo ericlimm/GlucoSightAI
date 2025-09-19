@@ -1,4 +1,4 @@
-const { GoogleGenAI } = require("@google/genai"); // 'GoogleGenerativeAI'에서 'GoogleGenAI'로 수정
+const { GoogleGenAI } = require("@google/genai");
 
 const API_KEY = process.env.GEMINI_API_KEY;
 
@@ -54,14 +54,7 @@ exports.handler = async function (event, context) {
   }
   
   try {
-    const genAI = new GoogleGenAI(API_KEY); // 'GoogleGenerativeAI'에서 'GoogleGenAI'로 수정
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: analysisSchema,
-      },
-    });
+    const genAI = new GoogleGenAI(API_KEY);
 
     const { imageBase64, mimeType } = JSON.parse(event.body);
     if (!imageBase64 || !mimeType) {
@@ -77,7 +70,17 @@ exports.handler = async function (event, context) {
       이 두 가지 결과를 모두 포함하여 JSON 형식으로 응답해야 합니다.` 
     };
 
-    const result = await model.generateContent([textPart, imagePart]);
+    // --- START: API 호출 방식 최종 수정 ---
+    const result = await genAI.models.generateContent({
+        model: "gemini-1.5-flash",
+        contents: [{ parts: [textPart, imagePart] }],
+        generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: analysisSchema,
+        },
+    });
+    // --- END: API 호출 방식 최종 수정 ---
+
     const response = result.response;
     const responseText = response.text();
     
