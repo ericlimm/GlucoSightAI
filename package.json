@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "dependencies": {
     "@google/genai": "0.13.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.23.0" 
+  },
+  "scripts": {
+    "build": "esbuild netlify/functions/analyze.js --bundle --platform=node --outfile=netlify/functions-dist/analyze.js"
   }
 }
-
