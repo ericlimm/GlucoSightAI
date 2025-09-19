@@ -1,60 +1,103 @@
 const { GoogleGenAI } = require("@google/genai");
 
-// 스키마는 변경 없습니다.
-const analysisSchema = { /* ... 이전과 동일한 스키마 내용 ... */ }; // 스키마 내용은 생략합니다.
+const API_KEY = process.env.GEMINI_API_KEY;
+
+// 스키마 정의는 변경 없습니다.
+const analysisSchema = {
+  type: "OBJECT",
+  properties: {
+    nutrition: {
+      type: "OBJECT",
+      description: "음식의 영양 정보.",
+      properties: {
+        foodName: { type: "STRING", description: "음식의 이름 (예: '닭가슴살 샐러드')." },
+        calories: { type: "NUMBER", description: "총 칼로리 (kcal)." },
+        carbohydrates: {
+          type: "OBJECT",
+          properties: {
+            total: { type: "NUMBER", description: "총 탄수화물 (g)." },
+            sugars: { type: "NUMBER", description: "당류 (g)." },
+            fiber: { type: "NUMBER", description: "식이섬유 (g)." },
+          },
+          required: ['total', 'sugars', 'fiber']
+        },
+        protein: { type: "NUMBER", description: "단백질 (g)." },
+        fat: { type: "NUMBER", description: "총 지방 (g)." },
+        glycemicIndex: { type: "NUMBER", description: "예상 혈당지수 (GI) (1-100)." },
+      },
+      required: ['foodName', 'calories', 'carbohydrates', 'protein', 'fat', 'glycemicIndex']
+    },
+    impact: {
+      type: "OBJECT",
+      description: "예상 혈당 영향 분석.",
+      properties: {
+        level: {
+          type: "STRING",
+          enum: ['STABLE', 'MODERATE', 'HIGH'],
+          description: "혈당 영향 수준: 'STABLE' (안정), 'MODERATE' (보통), 'HIGH' (높음)."
+        },
+        explanation: { type: "STRING", description: "당뇨 환자를 위한 쉽고 간단한 한국어 설명." }
+      },
+      required: ['level', 'explanation']
+    }
+  },
+  required: ['nutrition', 'impact']
+};
+
 
 exports.handler = async function (event, context) {
-  const API_KEY = process.env.GEMINI_API_KEY;
-
-  // --- START: 최종 진단 코드 ---
-  console.log("--- FINAL DIAGNOSIS: CHECKING API KEY ---");
-  if (API_KEY && typeof API_KEY === 'string' && API_KEY.length > 10) {
-    console.log("SUCCESS: GEMINI_API_KEY environment variable was found.");
-    console.log("API Key Length:", API_KEY.length);
-    console.log("API Key Snippet:", `${API_KEY.substring(0, 4)}...${API_KEY.slice(-4)}`);
-  } else {
-    console.error("CRITICAL FAILURE: GEMINI_API_KEY environment variable is MISSING, empty, or too short.");
-    console.log("Value of process.env.GEMINI_API_KEY:", API_KEY);
-    const errorMessage = "CRITICAL FAILURE: The API key is not available in the function's runtime environment.";
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: errorMessage }),
-    };
-  }
-  // --- END: 최종 진단 코드 ---
-  
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }
   
   try {
     const genAI = new GoogleGenAI(API_KEY);
-    const model = genAI.models.generateContent({ /* ... */ }); // 이 부분은 이제 실행될 것입니다.
-    // ... 나머지 코드는 이전과 동일 ...
+
+    // --- START: API 호출 방식 최종 수정 ---
+    // 1. 사용할 모델을 먼저 가져옵니다.
+    const model = genAI.getGenerativeModel({ 
+        model: "gemini-1.5-flash"
+    });
 
     const { imageBase64, mimeType } = JSON.parse(event.body);
+    if (!imageBase64 || !mimeType) {
+      return { statusCode: 400, body: JSON.stringify({ error: "이미지 데이터가 없습니다." }) };
+    }
+
     const imagePart = { inlineData: { data: imageBase64, mimeType: mimeType } };
-    const textPart = { text: `...` };
-    const result = await genAI.models.generateContent({
-        model: "gemini-1.5-flash",
+    
+    const textPart = { 
+      text: `당뇨병 환자를 위한 영양사로서 이 이미지의 음식을 분석해주세요. 
+      1. 음식 종류를 식별하고 양을 추정하여, 전체 식사에 대한 예상 영양 정보를 계산해주세요.
+      2. 그 영양 정보를 바탕으로, 일반적인 당뇨병 환자의 혈당에 미칠 영향을 'STABLE', 'MODERATE', 'HIGH' 중 하나로 분류하고, 그 이유를 쉽고 간단한 한국어로 설명해주세요.
+      이 두 가지 결과를 모두 포함하여 JSON 형식으로 응답해야 합니다.` 
+    };
+    
+    // 2. 모델에 콘텐츠와 출력 형식을 전달하여 결과를 생성합니다.
+    const result = await model.generateContent({
         contents: [{ parts: [textPart, imagePart] }],
         generationConfig: {
             responseMimeType: "application/json",
             responseSchema: analysisSchema,
         },
     });
+    // --- END: API 호출 방식 최종 수정 ---
+
     const response = result.response;
     const responseText = response.text();
+    
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
       body: responseText, 
     };
+
   } catch (error) {
-    console.error('Error during AI analysis:', error);
+    console.error('Error in Netlify function:', error);
+    const errorMessage = error.message || "서버에서 AI 분석 중 알 수 없는 오류가 발생했습니다.";
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: error.message }),
+      body: JSON.stringify({ error: errorMessage }),
     };
   }
 };
