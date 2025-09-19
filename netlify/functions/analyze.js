@@ -1,15 +1,8 @@
-// 메인 클래스만 필요합니다.
 const { GoogleGenAI } = require("@google/genai");
 
-// 환경 변수에서 API 키를 가져옵니다.
 const API_KEY = process.env.GEMINI_API_KEY;
 
-// --- START: 올바른 인증 ---
-// API 키를 사용하여 AI 클라이언트를 생성합니다. 이것이 결정적인 변경 사항입니다.
-const genAI = new GoogleGenAI(API_KEY);
-// --- END: 올바른 인증 ---
-
-// 스키마 정의는 이전과 동일합니다.
+// 스키마 정의는 변경 없습니다.
 const analysisSchema = {
   type: "OBJECT",
   properties: {
@@ -56,15 +49,15 @@ exports.handler = async function (event, context) {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }
+  if (!API_KEY) {
+    return { statusCode: 500, body: JSON.stringify({ error: "서버 설정 오류: API 키가 구성되지 않았습니다." }) };
+  }
   
   try {
-    // 이 요청에 사용할 특정 모델을 가져옵니다.
-    const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash"
-    });
+    const genAI = new GoogleGenAI(API_KEY);
 
     const { imageBase64, mimeType } = JSON.parse(event.body);
-    if (!imageBase64 || !mime.Type) {
+    if (!imageBase64 || !mimeType) {
       return { statusCode: 400, body: JSON.stringify({ error: "이미지 데이터가 없습니다." }) };
     }
 
@@ -76,15 +69,17 @@ exports.handler = async function (event, context) {
       2. 그 영양 정보를 바탕으로, 일반적인 당뇨병 환자의 혈당에 미칠 영향을 'STABLE', 'MODERATE', 'HIGH' 중 하나로 분류하고, 그 이유를 쉽고 간단한 한국어로 설명해주세요.
       이 두 가지 결과를 모두 포함하여 JSON 형식으로 응답해야 합니다.` 
     };
-    
-    // 올바른 메서드를 사용하여 콘텐츠를 생성합니다.
-    const result = await model.generateContent({
+
+    // --- START: API 호출 방식 최종 수정 ---
+    const result = await genAI.models.generateContent({
+        model: "gemini-1.5-flash",
         contents: [{ parts: [textPart, imagePart] }],
         generationConfig: {
             responseMimeType: "application/json",
             responseSchema: analysisSchema,
         },
     });
+    // --- END: API 호출 방식 최종 수정 ---
 
     const response = result.response;
     const responseText = response.text();
@@ -96,8 +91,7 @@ exports.handler = async function (event, context) {
     };
 
   } catch (error) {
-    // 이제 여기서 발생하는 모든 오류는 인증 오류가 아닌, 진짜 AI 오류일 것입니다.
-    console.error('AI 분석 중 오류 발생:', error);
+    console.error('Error in Netlify function:', error);
     const errorMessage = error.message || "서버에서 AI 분석 중 알 수 없는 오류가 발생했습니다.";
     return {
       statusCode: 500,
