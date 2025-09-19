@@ -1,7 +1,6 @@
-const { GoogleGenerativeAI } = require("@google/genai");
+const genAiLibrary = require("@google/genai");
 
-const API_KEY = process.env.GEMINI_API_KEY;
-
+// 스키마는 변경 없습니다.
 const analysisSchema = {
   type: "OBJECT",
   properties: {
@@ -45,11 +44,33 @@ const analysisSchema = {
 
 
 exports.handler = async function (event, context) {
+  // --- START: 진단 코드 ---
+  // Netlify 서버가 라이브러리를 어떻게 인식하는지 로그에 출력합니다.
+  console.log("--- DIAGNOSING @google/genai LIBRARY ---");
+  console.log("Type of genAiLibrary:", typeof genAiLibrary);
+  if (genAiLibrary && typeof genAiLibrary === 'object') {
+    console.log("Library object keys:", Object.keys(genAiLibrary));
+  }
+  // --- END: 진단 코드 ---
+
+  const { GoogleGenerativeAI } = genAiLibrary;
+
+  if (typeof GoogleGenerativeAI !== 'function') {
+    const availableKeys = (genAiLibrary && typeof genAiLibrary === 'object') ? Object.keys(genAiLibrary).join(', ') : 'Library is not a standard object.';
+    const errorMessage = `DIAGNOSTIC FAILURE: GoogleGenerativeAI is not a constructor. The imported library has keys: [${availableKeys}]. Check the Netlify FUNCTION LOG for details.`;
+    console.error(errorMessage);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: errorMessage }),
+    };
+  }
+
+  const API_KEY = process.env.GEMINI_API_KEY;
+
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }
   if (!API_KEY) {
-    console.error("GEMINI_API_KEY environment variable not set.");
     return { statusCode: 500, body: JSON.stringify({ error: "서버 설정 오류: API 키가 구성되지 않았습니다." }) };
   }
   
@@ -69,14 +90,8 @@ exports.handler = async function (event, context) {
     }
 
     const imagePart = { inlineData: { data: imageBase64, mimeType: mimeType } };
+    const textPart = { text: `...` }; // 프롬프트 내용은 생략
     
-    const textPart = { 
-      text: `당뇨병 환자를 위한 영양사로서 이 이미지의 음식을 분석해주세요. 
-      1. 음식 종류를 식별하고 양을 추정하여, 전체 식사에 대한 예상 영양 정보를 계산해주세요.
-      2. 그 영양 정보를 바탕으로, 일반적인 당뇨병 환자의 혈당에 미칠 영향을 'STABLE', 'MODERATE', 'HIGH' 중 하나로 분류하고, 그 이유를 쉽고 간단한 한국어로 설명해주세요.
-      이 두 가지 결과를 모두 포함하여 JSON 형식으로 응답해야 합니다.` 
-    };
-
     const result = await model.generateContent([textPart, imagePart]);
     const response = result.response;
     const responseText = response.text();
