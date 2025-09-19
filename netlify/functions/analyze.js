@@ -49,9 +49,6 @@ exports.handler = async function (event, context) {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method Not Allowed' }) };
   }
-  if (!API_KEY) {
-    return { statusCode: 500, body: JSON.stringify({ error: "서버 설정 오류: API 키가 구성되지 않았습니다." }) };
-  }
   
   try {
     const genAI = new GoogleGenAI(API_KEY);
@@ -69,8 +66,9 @@ exports.handler = async function (event, context) {
       2. 그 영양 정보를 바탕으로, 일반적인 당뇨병 환자의 혈당에 미칠 영향을 'STABLE', 'MODERATE', 'HIGH' 중 하나로 분류하고, 그 이유를 쉽고 간단한 한국어로 설명해주세요.
       이 두 가지 결과를 모두 포함하여 JSON 형식으로 응답해야 합니다.` 
     };
-
-    // --- START: API 호출 방식 최종 수정 ---
+    
+    console.log("AI 분석을 요청합니다...");
+    
     const result = await genAI.models.generateContent({
         model: "gemini-1.5-flash",
         contents: [{ parts: [textPart, imagePart] }],
@@ -79,6 +77,34 @@ exports.handler = async function (event, context) {
             responseSchema: analysisSchema,
         },
     });
-    // --- END: API 호출 방식 최종 수정 ---
+    
+    console.log("--- AI 응답 진단 ---");
+    // AI가 보낸 응답 전체를 안전하게 로그에 출력합니다.
+    console.log("Google AI의 원본 응답:", JSON.stringify(result, null, 2));
 
-    c
+    // AI 응답을 안전하게 추출합니다.
+    const response = result?.response;
+    if (!response) {
+      throw new Error("AI 응답 형식이 예상과 다릅니다. 'response' 키가 없습니다.");
+    }
+    
+    const responseText = response.text();
+    if (typeof responseText !== 'string') {
+        throw new Error("AI 응답 형식이 예상과 다릅니다. response.text()가 문자열을 반환하지 않았습니다.");
+    }
+
+    return {
+      statusCode: 200,
+      headers: { "Content-Type": "application/json" },
+      body: responseText, 
+    };
+
+  } catch (error) {
+    console.error('Netlify 함수에서 치명적인 오류 발생:', error);
+    const errorMessage = error.message || "AI 분석 중 알 수 없는 서버 오류가 발생했습니다.";
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: errorMessage }),
+    };
+  }
+};
