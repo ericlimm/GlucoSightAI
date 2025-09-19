@@ -1,5 +1,5 @@
-[build]
-  command = "npm install && npm run build"
+# build 섹션을 완전히 삭제합니다.
 
 [functions]
-  directory = "netlify/functions-dist"
+  directory = "netlify/functions"
+
