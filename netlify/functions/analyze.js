@@ -1,8 +1,15 @@
+// 메인 클래스만 필요합니다.
 const { GoogleGenAI } = require("@google/genai");
 
+// 환경 변수에서 API 키를 가져옵니다.
 const API_KEY = process.env.GEMINI_API_KEY;
 
-// 스키마 정의는 변경 없습니다.
+// --- START: 올바른 인증 ---
+// API 키를 사용하여 AI 클라이언트를 생성합니다. 이것이 결정적인 변경 사항입니다.
+const genAI = new GoogleGenAI(API_KEY);
+// --- END: 올바른 인증 ---
+
+// 스키마 정의는 이전과 동일합니다.
 const analysisSchema = {
   type: "OBJECT",
   properties: {
@@ -51,10 +58,13 @@ exports.handler = async function (event, context) {
   }
   
   try {
-    const genAI = new GoogleGenAI(API_KEY);
+    // 이 요청에 사용할 특정 모델을 가져옵니다.
+    const model = genAI.getGenerativeModel({ 
+        model: "gemini-1.5-flash"
+    });
 
     const { imageBase64, mimeType } = JSON.parse(event.body);
-    if (!imageBase64 || !mimeType) {
+    if (!imageBase64 || !mime.Type) {
       return { statusCode: 400, body: JSON.stringify({ error: "이미지 데이터가 없습니다." }) };
     }
 
@@ -67,32 +77,18 @@ exports.handler = async function (event, context) {
       이 두 가지 결과를 모두 포함하여 JSON 형식으로 응답해야 합니다.` 
     };
     
-    console.log("AI 분석을 요청합니다...");
-    
-    const result = await genAI.models.generateContent({
-        model: "gemini-1.5-flash",
+    // 올바른 메서드를 사용하여 콘텐츠를 생성합니다.
+    const result = await model.generateContent({
         contents: [{ parts: [textPart, imagePart] }],
         generationConfig: {
             responseMimeType: "application/json",
             responseSchema: analysisSchema,
         },
     });
-    
-    console.log("--- AI 응답 진단 ---");
-    // AI가 보낸 응답 전체를 안전하게 로그에 출력합니다.
-    console.log("Google AI의 원본 응답:", JSON.stringify(result, null, 2));
 
-    // AI 응답을 안전하게 추출합니다.
-    const response = result?.response;
-    if (!response) {
-      throw new Error("AI 응답 형식이 예상과 다릅니다. 'response' 키가 없습니다.");
-    }
-    
+    const response = result.response;
     const responseText = response.text();
-    if (typeof responseText !== 'string') {
-        throw new Error("AI 응답 형식이 예상과 다릅니다. response.text()가 문자열을 반환하지 않았습니다.");
-    }
-
+    
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
@@ -100,8 +96,9 @@ exports.handler = async function (event, context) {
     };
 
   } catch (error) {
-    console.error('Netlify 함수에서 치명적인 오류 발생:', error);
-    const errorMessage = error.message || "AI 분석 중 알 수 없는 서버 오류가 발생했습니다.";
+    // 이제 여기서 발생하는 모든 오류는 인증 오류가 아닌, 진짜 AI 오류일 것입니다.
+    console.error('AI 분석 중 오류 발생:', error);
+    const errorMessage = error.message || "서버에서 AI 분석 중 알 수 없는 오류가 발생했습니다.";
     return {
       statusCode: 500,
       body: JSON.stringify({ error: errorMessage }),
